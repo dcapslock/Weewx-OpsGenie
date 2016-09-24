@@ -2,7 +2,9 @@
 # This .gitignore file was automatically created by Microsoft(R) Visual Studio.
 ################################################################################
 
-/.vs/Weewx-OpsGenie/v14/.suo
+*.suo
 *.pyproj
 *.user
 *.sln
+/Weewx-OpsGenie.tar
+/Weewx-OpsGenie.tar.gz

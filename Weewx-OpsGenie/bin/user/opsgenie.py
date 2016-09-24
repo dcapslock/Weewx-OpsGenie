@@ -7,6 +7,8 @@ import Queue
 import threading
 import syslog
 import json
+import urllib
+import urllib2
 
 import weewx
 import weewx.units
@@ -396,3 +398,28 @@ class OpsGenieAlertsThread(RESTThread):
         json_data = json.dumps(record)
         syslog.syslog(syslog.LOG_DEBUG, "restx: OpsGenieAlerts: {}: JSON: {!r}".format(self.Alias, json_data))
         return json_data
+
+    def process_record(self, record, dbmanager):
+        """Patched Weewx Version 3.5.0 process_record
+           
+        Newer Weewx will have patched version so if 
+        newer than 3.5.0 then call base class
+         
+        """
+
+        UNPATCHED_WEEWX = "3.5.0" 
+        if StrictVersion(weewx.__version__) > StrictVersion(UNPATCHED_WEEWX):
+            super(OpsGenieAlertsThread, self).process_record(self, record, dbmanager)   
+        else:
+             # Get the full record by querying the database ...
+            _full_record = self.get_record(record, dbmanager)
+            # ... convert to US if necessary ...
+            _us_record = weewx.units.to_US(_full_record)
+            # ... format the URL, using the relevant protocol ...
+            _url = self.format_url(_us_record)
+            _data = self.format_data(_us_record)
+            # ... convert to a Request object ...
+            _request = urllib2.Request(_url)
+            _request.add_header("User-Agent", "weewx/%s" % weewx.__version__)
+            # ... then, finally, post it
+            self.post_with_retries(_request, _data)
