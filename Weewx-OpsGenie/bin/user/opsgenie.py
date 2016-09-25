@@ -9,6 +9,7 @@ import syslog
 import json
 import urllib
 import urllib2
+from distutils.version import StrictVersion
 
 import weewx
 import weewx.units
