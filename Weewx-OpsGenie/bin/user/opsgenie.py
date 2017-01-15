@@ -410,7 +410,7 @@ class OpsGenieAlertsThread(RESTThread):
 
         UNPATCHED_WEEWX = "3.5.0" 
         if StrictVersion(weewx.__version__) > StrictVersion(UNPATCHED_WEEWX):
-            super(OpsGenieAlertsThread, self).process_record(self, record, dbmanager)   
+            super(OpsGenieAlertsThread, self).process_record(record, dbmanager)   
         else:
              # Get the full record by querying the database ...
             _full_record = self.get_record(record, dbmanager)
