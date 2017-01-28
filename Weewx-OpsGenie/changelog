@@ -1,3 +1,6 @@
+0.2 28jan2016
+* Fix exception with weewx versions > 3.5
+
 0.1.1 25sep2016
 * Import StrictVersion
 
