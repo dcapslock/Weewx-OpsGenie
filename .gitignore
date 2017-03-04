@@ -8,3 +8,5 @@
 *.sln
 /Weewx-OpsGenie.tar
 /Weewx-OpsGenie.tar.gz
+.idea/
+.vs/
