@@ -29,7 +29,7 @@ To enable Heartbeats
 
         apiKey              OpsGenie API Heartbeat Key
         heartbeatName       Name of the heartbeat (must already be created in 
-							OpsGenie)
+                            OpsGenie)
 
 ALERTS
 
@@ -38,21 +38,21 @@ To enable an alert follow the information below
     OpsGenie Alerts config weewx.conf:
 
     [OpsGenie]
-	    [[Alerts]]
-		    apiKey = 
-		    ExpressionUnits = METRICWX
-		    Recipients = 
-		    Entity = 
-		    Source = 
-		    Tags = 
-		    Actions = 
+        [[Alerts]]
+            apiKey = 
+            ExpressionUnits = METRICWX
+            Recipients = 
+            Entity = 
+            Source = 
+            Tags = 
+            Actions = 
 
-		    [[[IsRaining]]]
-			    Expression = precipType > 0
-			    Alias = IsRaining
-			    Message = It is Raining
-			    Description = Test Description
-			    Details = precipType, rainRate
+            [[[IsRaining]]]
+                Expression = precipType > 0
+                Alias = IsRaining
+                Message = It is Raining
+                Description = Test Description
+                Details = precipType, rainRate
 
         Global Options
         
