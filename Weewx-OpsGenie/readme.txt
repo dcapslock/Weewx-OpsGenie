@@ -41,7 +41,7 @@ To enable an alert follow the information below
         [[Alerts]]
             apiKey = 
             ExpressionUnits = METRICWX
-            Recipients = 
+            Responders = 
             Entity = 
             Source = 
             Tags = 
@@ -66,9 +66,8 @@ To enable an alert follow the information below
 
             Alias               An alias for the OpsGenie alert. OpsGenie will treat subsequent triggering of this
                                 alert as the same due to the same alias being passed. [Required]
-            Recipients          Comma separated list of OpsGenie recipients. Must match a valid OpsGenie recipient
-                                which include Users, and Schedules. For users you MUST use the user email address!
-                                Use a User for a free OpsGenie account. [Optional: Recpients can be left blank if 
+            Responders          Comma separated list of OpsGenie responders. Must match a valid OpsGenie Username or ID
+                                [Optional: Recpients can be left blank if 
                                 you have configured this in the OpsGenie integration]
             Entity              What you wish passed to OpsGenie as an Entity [Optional]
             Source              What you wish passed to OpsGenie as an Source [Optional]
@@ -82,7 +81,7 @@ To enable an alert follow the information below
                                 separated list of ovbservation details you wish to pass. [Optional][Max 8000 chars for 
                                 the nested JSON map that will be created]
 
-            See https://www.opsgenie.com/docs/web-api/alert-api#createAlertRequest for more details on these fields.
+            See https://docs.opsgenie.com/docs/alert-api#section-create-alert for more details on these fields.
             NOTE: The exact implementation and effect of these fields will depend on your OpsGenie API integration.
             Those supported by this implementation generally support the default OpsGenie API integration.
 

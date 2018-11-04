@@ -9,6 +9,7 @@ import syslog
 import json
 import urllib
 import urllib2
+import base64
 from distutils.version import StrictVersion
 
 import weewx
@@ -16,6 +17,7 @@ import weewx.units
 from weewx.units import ValueTuple
 from weeutil.weeutil import option_as_list
 from weeutil.weeutil import to_bool, accumulateLeaves
+from weeutil.weeutil import log_traceback
 from weewx.restx import StdRESTful, RESTThread
 
 class OpsGenieHeartbeat(StdRESTful):
@@ -36,7 +38,7 @@ class OpsGenieHeartbeat(StdRESTful):
 
     """
 
-    archive_url = 'https://api.opsgenie.com/v1/json/heartbeat/send/'
+    archive_url = 'https://api.opsgenie.com/v2/heartbeats/'
 
     def __init__(self, engine, config_dict):
         
@@ -95,7 +97,7 @@ class OpsGenieHeartbeatThread(RESTThread):
         Optional parameters:
         
           server_url: The OpsGenie heartbeat URL. 
-          Default is 'https://api.opsgenie.com/v1/json/heartbeat/send/'
+          Default is 'https://api.opsgenie.com/v2/heartbeats/'
           
           post_interval: How long to wait between posts.
           Default is 300 seconds (5 minutes).
@@ -139,22 +141,27 @@ class OpsGenieHeartbeatThread(RESTThread):
         
     def get_record(self, dummy_record, dummy_manager):
         _record = {}
-        _record['apiKey']   = self.apiKey
-        _record['name']   = self.heartbeatName
         _record['usUnits'] = weewx.US
         
         return _record
         
     def format_url(self, record):
         """Return an URL for posting using the OpsGenie protocol."""
-        return self.server_url
+        return self.server_url + "{}/ping".format(self.heartbeatName)
 
-    def format_data(self, record):
-        """Return Data for posting to OpsGenie Restful interface"""
-        #need to pop usUnits as OpsGenie will not be expecting
-        record.pop('usUnits', None)
-        syslog.syslog(syslog.LOG_DEBUG, "restx: OpsGenieHeartbeat: format_data: {}".format(json.dumps(record)))
-        return json.dumps(record)
+    def process_record(self, record, dbmanager):
+        # Get the full record by querying the database ...
+        _full_record = self.get_record(record, dbmanager)
+        # ... format the URL, using the relevant protocol ...
+        _url = self.format_url(_full_record)
+        if self.skip_upload:
+            raise AbortedPost()
+        # ... convert to a Request object ...
+        _request = urllib2.Request(_url)
+        _request.add_header("User-Agent", "weewx/%s" % weewx.__version__)
+        _request.add_header("Authorization", "Basic " + base64.encodestring(self.apiKey).replace('\n', ''))
+        # ... then, finally, post it
+        self.post_with_retries(_request)		
 
 class OpsGenieAlerts(StdRESTful):
     """Class for spawning OpsGenie alert threads
@@ -162,21 +169,21 @@ class OpsGenieAlerts(StdRESTful):
     OpsGenie Alerts config weewx.conf:
 
     [OpsGenie]
-	    [[Alerts]]
-		    apiKey = 
-		    ExpressionUnits = METRICWX
-		    Recipients = 
-		    Entity = 
-		    Source = 
-		    Tags = 
-		    Actions = 
+        [[Alerts]]
+            apiKey = 
+            ExpressionUnits = METRICWX
+            Responders = 
+            Entity = 
+            Source = 
+            Tags = 
+            Actions = 
 
-		    [[[IsRaining]]]
-			    Expression = precipType > 0
-			    Alias = IsRaining
-			    Message = It is Raining
-			    Description = Test Description
-			    Details = precipType, rainRate
+            [[[IsRaining]]]
+                Expression = precipType > 0
+                Alias = IsRaining
+                Message = It is Raining
+                Description = Test Description
+                Details = precipType, rainRate
 
         Global Options
         
@@ -190,9 +197,8 @@ class OpsGenieAlerts(StdRESTful):
 
             Alias               An alias for the OpsGenie alert. OpsGenie will treat subsequent triggering of this
                                 alert as the same due to the same alias being passed. [Required]
-            Recipients          Comma separated list of OpsGenie recipients. Must match a valid OpsGenie recipient
-                                which include Users, and Schedules. For users you MUST use the user email address!
-                                Use a User for a free OpsGenie account. [Optional: Recpients can be left blank if 
+            Responders          Comma separated list of OpsGenie responders. Must match a valid OpsGenie Username or ID
+                                [Optional: Recpients can be left blank if 
                                 you have configured this in the OpsGenie integration]
             Entity              What you wish passed to OpsGenie as an Entity [Optional]
             Source              What you wish passed to OpsGenie as an Source [Optional]
@@ -206,13 +212,13 @@ class OpsGenieAlerts(StdRESTful):
                                 separated list of ovbservation details you wish to pass. [Optional][Max 8000 chars for 
                                 the nested JSON map that will be created]
 
-            See https://www.opsgenie.com/docs/web-api/alert-api#createAlertRequest for more details on these fields.
+            See https://docs.opsgenie.com/docs/alert-api#section-create-alert for more details on these fields.
             NOTE: The exact implementation and effect of these fields will depend on your OpsGenie API integration.
             Those supported by this implementation generally support the default OpsGenie API integration.
 
     """
 
-    alert_url = 'https://api.opsgenie.com/v1/json/alert/' 
+    alert_url = 'https://api.opsgenie.com/v2/alerts/' 
 
     def __init__(self, engine, config_dict):
         
@@ -293,7 +299,7 @@ class OpsGenieAlerts(StdRESTful):
                     self.alerts[subsection]['AlertActive'] = False
             except Exception:
                 syslog.syslog(syslog.LOG_CRIT, "restx: OpsGenieAlerts: Exception while evaluation expression for {}".format(self.alerts[subsection]['Alias']))
-                weeutil.weeutil.log_traceback('*** ', syslog.LOG_DEBUG)            
+                log_traceback('*** ', syslog.LOG_DEBUG)            
         
 class OpsGenieAlertsThread(RESTThread):
     """Concrete threaded class for sending OpsGenie alerts."""
@@ -316,7 +322,7 @@ class OpsGenieAlertsThread(RESTThread):
         Optional parameters:
         
           server_url: The OpsGenie alert URL. 
-          Default is 'https://api.opsgenie.com/v1/json/alert'
+          Default is 'https://api.opsgenie.com/v2/alerts'
           
           post_interval: How long to wait between alert notifications.
           Default is 3600 seconds (1 hour).
@@ -358,31 +364,45 @@ class OpsGenieAlertsThread(RESTThread):
         self.apiKey = alert_dict['apiKey']
         self.Alias = alert_dict['Alias']
         self.Message = alert_dict['Message']
-        self.Recipients = option_as_list(alert_dict.get('Recipients'))
+        self.Responders = option_as_list(alert_dict.get('Responders'))
         self.Entity = alert_dict.get('Entity') 
         self.Source = alert_dict.get('Source')     
-        self.Tags = alert_dict.get('Tags')   
-        self.Actions = alert_dict.get('Actions') 
+        self.Tags = option_as_list(alert_dict.get('Tags'))   
+        self.Actions = option_as_list(alert_dict.get('Actions'))
         self.Description = alert_dict.get('Description') 
         self.Details = option_as_list(alert_dict.get('Details'))
         
     def get_record(self, record, dummy_manager):
         _record = {}
-        _record['apiKey'] = self.apiKey
         _record['message'] = self.Message
         _record['alias'] = self.Alias
-        _record['recipients'] = self.Recipients
-        _record['entity'] = self.Entity
-        _record['source'] = self.Source
-        _record['tags'] = self.Tags
-        _record['actions'] = self.Actions
-        _record['description'] = self.Description
-        _record['details'] = dict()
-
-        for detail in self.Details:
-            vt = weewx.units.as_value_tuple(record, detail)
-            vh = weewx.units.ValueHelper(vt, converter=weewx.units.StdUnitConverters[record['usUnits']])
-            _record['details'][detail] = vh.toString()
+        
+        if self.Responders:
+            _record['responders'] = list()
+            for responder in self.Responders:
+                _record['responders'].append({ "username": responder, "type": "user" })
+        
+        if self.Entity:
+            _record['entity'] = self.Entity
+        
+        if self.Source:
+            _record['source'] = self.Source
+        
+        if self.Tags:
+            _record['tags'] = self.Tags
+        
+        if self.Actions:
+            _record['actions'] = self.Actions 
+        
+        if self.Description:
+            _record['description'] = self.Description
+        
+        if self.Details:
+            _record['details'] = dict()
+            for detail in self.Details:
+                vt = weewx.units.as_value_tuple(record, detail)
+                vh = weewx.units.ValueHelper(vt, converter=weewx.units.StdUnitConverters[record['usUnits']])
+                _record['details'][detail] = vh.toString()
 
         _record['usUnits'] = weewx.US
         
@@ -401,26 +421,18 @@ class OpsGenieAlertsThread(RESTThread):
         return json_data
 
     def process_record(self, record, dbmanager):
-        """Patched Weewx Version 3.5.0 process_record
-           
-        Newer Weewx will have patched version so if 
-        newer than 3.5.0 then call base class
-         
-        """
-
-        UNPATCHED_WEEWX = "3.5.0" 
-        if StrictVersion(weewx.__version__) > StrictVersion(UNPATCHED_WEEWX):
-            super(OpsGenieAlertsThread, self).process_record(record, dbmanager)   
-        else:
-             # Get the full record by querying the database ...
-            _full_record = self.get_record(record, dbmanager)
-            # ... convert to US if necessary ...
-            _us_record = weewx.units.to_US(_full_record)
-            # ... format the URL, using the relevant protocol ...
-            _url = self.format_url(_us_record)
-            _data = self.format_data(_us_record)
-            # ... convert to a Request object ...
-            _request = urllib2.Request(_url)
-            _request.add_header("User-Agent", "weewx/%s" % weewx.__version__)
-            # ... then, finally, post it
-            self.post_with_retries(_request, _data)
+        # Get the full record by querying the database ...
+        _full_record = self.get_record(record, dbmanager)
+        # ... format the URL, using the relevant protocol ...
+        _url = self.format_url(_full_record)
+        #  ... and any POST payload.
+        _data = self.format_data(_full_record)        
+        if self.skip_upload:
+            raise AbortedPost()
+        # ... convert to a Request object ...
+        _request = urllib2.Request(_url)
+        _request.add_header("User-Agent", "weewx/%s" % weewx.__version__)
+        _request.add_header("Authorization", "Basic " + base64.encodestring(self.apiKey).replace('\n', ''))
+        _request.add_header("Content-Type", "application/json")
+        # ... then, finally, post it
+        self.post_with_retries(_request, _data)
