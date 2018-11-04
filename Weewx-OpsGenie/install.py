@@ -25,7 +25,7 @@ class OpsGenieInstaller(ExtensionInstaller):
                                     'Description': 'A long description of the event',
                                     'Details': 'outTemp',
                                     'Tags': 'TEST',
-                                    'Recipients': 'someone@somewhere.com'
+                                    'Responders': 'someone@somewhere.com'
                                 }                           
                             }  
                         }
@@ -40,7 +40,7 @@ class OpsGenieInstaller(ExtensionInstaller):
                                                        "Source = #Can also be set at the Alert level"}
 
         super(OpsGenieInstaller, self).__init__(
-            version="0.1",
+            version="0.3",
             name='OpsGenie',
             description='OpsGenie - Weewx extension to send OpsGenie Heartbeats and Alerts',
             author="Darryn Capes-Davis",
